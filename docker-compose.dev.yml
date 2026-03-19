@@ -1,0 +1,20 @@
+services:
+  marzban:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.dev
+    restart: always
+    env_file: .env.dev
+    ports:
+      - "8000:8080"
+    volumes:
+      # Host data under ./.marzban; do not mount all of /usr/local (would hide Python from the image).
+      - ./.marzban/var/lib/marzban:/var/lib/marzban
+
+  proxy:
+    image: alpine/socat
+    restart: always
+    network_mode: "service:marzban"
+    command: tcp-listen:8080,fork,reuseaddr tcp-connect:127.0.0.1:8000
+    depends_on:
+      - marzban
