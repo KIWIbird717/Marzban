@@ -8,7 +8,6 @@ services:
     ports:
       - "8000:8080"
     volumes:
-      # Host data under ./.marzban; do not mount all of /usr/local (would hide Python from the image).
       - ./.marzban/var/lib/marzban:/var/lib/marzban
 
   proxy:
