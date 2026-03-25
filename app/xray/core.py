@@ -33,7 +33,8 @@ class XRayCore:
 
     def get_version(self):
         cmd = [self.executable_path, "version"]
-        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8')
+        output = subprocess.check_output(
+            cmd, stderr=subprocess.STDOUT).decode('utf-8')
         m = re.match(r'^Xray (\d+\.\d+\.\d+)', output)
         if m:
             return m.groups()[0]
@@ -42,7 +43,8 @@ class XRayCore:
         cmd = [self.executable_path, "x25519"]
         if private_key:
             cmd.extend(['-i', private_key])
-        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8')
+        output = subprocess.check_output(
+            cmd, stderr=subprocess.STDOUT).decode('utf-8')
         m = re.match(r'Private key: (.+)\nPublic key: (.+)', output)
         if m:
             private, public = m.groups()

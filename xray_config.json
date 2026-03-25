@@ -23,6 +23,24 @@
         "clients": [],
         "network": "tcp,udp"
       }
+    },
+    {
+      "tag": "VLESS LOCAL",
+      "listen": "127.0.0.1",
+      "port": 10000,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "flow": ""
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp"
+      }
     }
   ],
   "outbounds": [

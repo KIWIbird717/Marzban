@@ -84,6 +84,7 @@ def user_subscription(
             )
         )
 
+    # print(f'{user_agent=}')
     crud.update_user_sub(db, dbuser, user_agent)
     response_headers = {
         "content-disposition": f'attachment; filename="{user.username}"',

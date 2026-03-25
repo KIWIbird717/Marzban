@@ -22,7 +22,8 @@ Self-signed CAs are useful in testing or internal use cases, they’re not suita
         return
 
     if not os.path.isfile(cert_file_path):
-        raise ValueError(f"SSL certificate file '{cert_file_path}' does not exist.")
+        raise ValueError(
+            f"SSL certificate file '{cert_file_path}' does not exist.")
     if not os.path.isfile(key_file_path):
         raise ValueError(f"SSL key file '{key_file_path}' does not exist.")
 
@@ -38,7 +39,8 @@ Self-signed CAs are useful in testing or internal use cases, they’re not suita
             cert = x509.load_pem_x509_certificate(cert_data, default_backend())
 
         if cert.issuer == cert.subject:
-            raise ValueError("The certificate is self-signed and not issued by a trusted CA.")
+            raise ValueError(
+                "The certificate is self-signed and not issued by a trusted CA.")
 
     except Exception as e:
         raise ValueError(f"Certificate verification failed: {e}")
@@ -53,7 +55,8 @@ if __name__ == "__main__":
         UVICORN_SSL_CA_TYPE = "public"
 
     if UVICORN_SSL_CERTFILE and UVICORN_SSL_KEYFILE and UVICORN_SSL_CA_TYPE:
-        validate_cert_and_key(UVICORN_SSL_CERTFILE, UVICORN_SSL_KEYFILE, UVICORN_SSL_CA_TYPE)
+        validate_cert_and_key(UVICORN_SSL_CERTFILE,
+                              UVICORN_SSL_KEYFILE, UVICORN_SSL_CA_TYPE)
 
         bind_args['ssl_certfile'] = UVICORN_SSL_CERTFILE
         bind_args['ssl_keyfile'] = UVICORN_SSL_KEYFILE
@@ -82,10 +85,10 @@ Use the following command:
 
 {click.style(f'ssh -L {UVICORN_PORT}:localhost:{UVICORN_PORT} user@server', italic=True, fg="cyan")}
 
-Then, navigate to {click.style(f'http://127.0.0.1:{UVICORN_PORT}', bold=True)} on your computer.
+Then, navigate to {click.style(f'http://{UVICORN_HOST}:{UVICORN_PORT}', bold=True)} on your computer.
             """)
 
-            bind_args['host'] = '127.0.0.1'
+            bind_args['host'] = UVICORN_HOST
             bind_args['port'] = UVICORN_PORT
 
     if DEBUG:

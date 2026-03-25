@@ -5,15 +5,47 @@ services:
       dockerfile: ./Dockerfile.dev
     restart: always
     env_file: .env.dev
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
-      - "8000:8080"
+      - "8000:8000"
     volumes:
+      - .:/code
       - ./.marzban/var/lib/marzban:/var/lib/marzban
-
-  proxy:
-    image: alpine/socat
-    restart: always
-    network_mode: "service:marzban"
-    command: tcp-listen:8080,fork,reuseaddr tcp-connect:127.0.0.1:8000
     depends_on:
-      - marzban
+      mysql:
+        condition: service_healthy
+    networks:
+      - default_network
+
+  mysql:
+    image: mysql:8.3
+    env_file: .env.dev
+    command:
+      - --mysqlx=OFF
+      - --character_set_server=utf8mb4
+      - --collation_server=utf8mb4_unicode_ci
+      - --disable-log-bin
+      - --host-cache-size=0
+      - --innodb-open-files=1024
+      - --innodb-buffer-pool-size=268435456
+    volumes:
+      - mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    ports:
+      - "3306:3306"
+    networks:
+      - default_network
+
+volumes:
+  mysql:
+    name: mysql
+
+networks:
+  default_network:
+    driver: bridge
