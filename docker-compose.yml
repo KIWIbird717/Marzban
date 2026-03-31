@@ -2,7 +2,7 @@ services:
   marzban:
     build:
       context: .
-      dockerfile: ./Dockerfile.prod
+      dockerfile: ./Dockerfile
     restart: always
     env_file: .env
     volumes:
