@@ -1,5 +1,6 @@
 import re
-from app import logger
+import json
+import base64
 from distutils.version import LooseVersion
 
 from fastapi import APIRouter, Depends, Header, Path, Request, Response
@@ -24,6 +25,8 @@ from config import (
     USE_CUSTOM_JSON_FOR_V2RAYN,
     USE_CUSTOM_JSON_FOR_V2RAYNG,
     XRAY_SUBSCRIPTION_PATH,
+    SUB_DEVICE_LIMIT_TITLE,
+    SUB_DEVICE_LIMIT_ANNOUNCE
 )
 
 client_config = {
@@ -63,6 +66,103 @@ def modify_profile_web_page_url(token: str, request: Request):
     return build_url(SUB_SUBSCRIPTION_BASE_URL, XRAY_SUBSCRIPTION_PATH, token)
 
 
+def generate_device_limit_config(config_format: str, as_base64: bool) -> str:
+    """
+    Генерирует конфиг-заглушку для случая когда лимит устройств исчерпан.
+    Конфиг содержит нерабочий прокси и текст с пояснением.
+    """
+    REMARK = "Limit of devices reached"
+
+    if config_format == "v2ray-json":
+        config = json.dumps({
+            "remarks": REMARK,
+            "dns": {"servers": ["1.1.1.1"], "queryStrategy": "UseIP"},
+            "inbounds": [
+                {
+                    "tag": "socks",
+                    "listen": "127.0.0.1",
+                    "port": 10808,
+                    "protocol": "socks",
+                    "settings": {"auth": "noauth", "udp": True},
+                }
+            ],
+            "outbounds": [
+                {
+                    "tag": "proxy",
+                    "protocol": "vless",
+                    "settings": {
+                        "vnext": [{
+                            "address": "0.0.0.0",
+                            "port": 1,
+                            "users": [{"id": "00000000-0000-0000-0000-000000000000", "encryption": "none"}]
+                        }]
+                    },
+                    "streamSettings": {"network": "tcp"},
+                },
+                {"protocol": "freedom", "tag": "direct"},
+                {"protocol": "blackhole", "tag": "block"},
+            ],
+            "routing": {"rules": []},
+        }, ensure_ascii=False)
+
+    elif config_format in ("clash", "clash-meta"):
+        config = (
+            f"proxies:\n"
+            f"  - name: \"{REMARK}\"\n"
+            f"    type: ss\n"
+            f"    server: 0.0.0.0\n"
+            f"    port: 1\n"
+            f"    cipher: aes-256-gcm\n"
+            f"    password: limit\n"
+            f"proxy-groups:\n"
+            f"  - name: Proxy\n"
+            f"    type: select\n"
+            f"    proxies:\n"
+            f"      - \"{REMARK}\"\n"
+            f"rules:\n"
+            f"  - MATCH,Proxy\n"
+        )
+
+    elif config_format == "sing-box":
+        config = json.dumps({
+            "outbounds": [
+                {
+                    "type": "shadowsocks",
+                    "tag": REMARK,
+                    "server": "0.0.0.0",
+                    "server_port": 1,
+                    "method": "aes-256-gcm",
+                    "password": "limit",
+                }
+            ]
+        }, ensure_ascii=False)
+
+    elif config_format == "outline":
+        config = json.dumps({
+            "servers": [{
+                "id": "limit",
+                "name": REMARK,
+                "port": 1,
+                "method": "aes-256-gcm",
+                "password": "limit",
+                "server": "0.0.0.0",
+            }]
+        }, ensure_ascii=False)
+
+    else:
+        # v2ray base64 — одна ссылка-заглушка
+        link = (
+            "vless://00000000-0000-0000-0000-000000000000@0.0.0.0:1"
+            f"?encryption=none&type=tcp#{REMARK}"
+        )
+        config = link
+
+    if as_base64:
+        config = base64.b64encode(config.encode()).decode()
+
+    return config
+
+
 @router.get("/{token}/")
 @router.get("/{token}", include_in_schema=False)
 def user_subscription(
@@ -84,7 +184,43 @@ def user_subscription(
             )
         )
 
-    # print(f'{user_agent=}')
+    # Проверяем и регистрируем клиента
+    allowed = crud.register_user_client(db, dbuser, user_agent)
+    if not allowed:
+        response_headers = {
+            "content-disposition": f'attachment; filename="{user.username}"',
+            "profile-title": encode_title(SUB_DEVICE_LIMIT_TITLE),
+            "subscription-userinfo": "; ".join(
+                f"{key}={val}"
+                for key, val in get_subscription_user_info(user).items()
+            ),
+            "announce": encode_title(SUB_DEVICE_LIMIT_ANNOUNCE)
+        }
+
+        if re.match(r'^([Cc]lash-verge|[Cc]lash[-\.]?[Mm]eta|[Ff][Ll][Cc]lash|[Mm]ihomo)', user_agent):
+            conf = generate_device_limit_config("clash-meta", as_base64=False)
+            return Response(content=conf, media_type="text/yaml", headers=response_headers)
+
+        elif re.match(r'^([Cc]lash|[Ss]tash)', user_agent):
+            conf = generate_device_limit_config("clash", as_base64=False)
+            return Response(content=conf, media_type="text/yaml", headers=response_headers)
+
+        elif re.match(r'^(SFA|SFI|SFM|SFT|[Kk]aring|[Hh]iddify[Nn]ext)', user_agent):
+            conf = generate_device_limit_config("sing-box", as_base64=False)
+            return Response(content=conf, media_type="application/json", headers=response_headers)
+
+        elif re.match(r'^(SS|SSR|SSD|SSS|Outline|Shadowsocks|SSconf)', user_agent):
+            conf = generate_device_limit_config("outline", as_base64=False)
+            return Response(content=conf, media_type="application/json", headers=response_headers)
+
+        elif re.match(r'^(v2rayN|v2rayNG|[Ss]treisand|Happ)', user_agent):
+            conf = generate_device_limit_config("v2ray-json", as_base64=False)
+            return Response(content=conf, media_type="application/json", headers=response_headers)
+
+        else:
+            conf = generate_device_limit_config("v2ray", as_base64=True)
+            return Response(content=conf, media_type="text/plain", headers=response_headers)
+
     crud.update_user_sub(db, dbuser, user_agent)
     response_headers = {
         "content-disposition": f'attachment; filename="{user.username}"',

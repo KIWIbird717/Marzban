@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+IP_ACTIVITY_TTL = config("IP_ACTIVITY_TTL", cast=int, default=60)
 
 SQLALCHEMY_DATABASE_URL = config(
     "SQLALCHEMY_DATABASE_URL", default="sqlite:///db.sqlite3")
@@ -171,6 +172,8 @@ SUB_ANNOUNCE = config("SUB_ANNOUNCE", default="")
 SUB_HIDE_SETTINGS_HAPP = config(
     "SUB_HIDE_SETTINGS_HAPP", cast=bool, default=False)
 SUB_SUBSCRIPTION_BASE_URL = config('SUB_SUBSCRIPTION_BASE_URL', default="")
+SUB_DEVICE_LIMIT_TITLE = config('SUB_DEVICE_LIMIT_TITLE', default="⛔ Лимит устройств")
+SUB_DEVICE_LIMIT_ANNOUNCE = config('SUB_DEVICE_LIMIT_ANNOUNCE', default="")
 
 # discord webhook log
 DISCORD_WEBHOOK_URL = config("DISCORD_WEBHOOK_URL", default="")

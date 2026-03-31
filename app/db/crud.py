@@ -10,6 +10,7 @@ from sqlalchemy import and_, delete, func, or_
 from sqlalchemy.orm import Query, Session, joinedload
 from sqlalchemy.sql.functions import coalesce
 
+from app import logger
 from app.db.models import (
     JWT,
     TLS,
@@ -28,6 +29,7 @@ from app.db.models import (
     User,
     UserTemplate,
     UserUsageResetLogs,
+    UserClient
 )
 from app.models.admin import AdminCreate, AdminModify, AdminPartialModify
 from app.models.node import NodeCreate, NodeModify, NodeStatus, NodeUsageResponse
@@ -43,7 +45,75 @@ from app.models.user import (
 )
 from app.models.user_template import UserTemplateCreate, UserTemplateModify
 from app.utils.helpers import calculate_expiration_days, calculate_usage_percent
-from config import NOTIFY_DAYS_LEFT, NOTIFY_REACHED_USAGE_PERCENT, USERS_AUTODELETE_DAYS
+from config import NOTIFY_DAYS_LEFT, NOTIFY_REACHED_USAGE_PERCENT, USERS_AUTODELETE_DAYS, IP_ACTIVITY_TTL
+
+
+def get_user_clients(db: Session, user_id: int) -> List[UserClient]:
+    return (
+        db.query(UserClient)
+        .filter(UserClient.user_id == user_id)
+        .order_by(UserClient.first_seen.asc())
+        .all()
+    )
+
+
+def register_user_client(db: Session, dbuser: User, user_agent: str) -> bool:
+    """
+    Регистрирует клиент пользователя по user_agent.
+
+    Возвращает:
+        True  — клиент добавлен или уже существует (можно отдавать конфиг)
+        False — лимит устройств исчерпан (отказать)
+    """
+    if not user_agent:
+        return True  # нет user_agent — пропускаем проверку
+
+    # Известный клиент — просто обновляем last_seen
+    existing = (
+        db.query(UserClient)
+        .filter(
+            UserClient.user_id == dbuser.id,
+            UserClient.user_agent == user_agent,
+        )
+        .first()
+    )
+    if existing:
+        existing.last_seen = datetime.utcnow()
+        db.commit()
+        return True
+
+    # Новый клиент — проверяем лимит
+    if dbuser.device_limit >= 0:
+        current_count = (
+            db.query(UserClient)
+            .filter(UserClient.user_id == dbuser.id)
+            .count()
+        )
+        if current_count >= dbuser.device_limit:
+            return False  # лимит исчерпан
+
+    # Добавляем нового клиента
+    db.add(UserClient(
+        user_id=dbuser.id,
+        user_agent=user_agent,
+    ))
+    db.commit()
+    return True
+
+
+def remove_user_client(db: Session, user_id: int, client_id: int) -> bool:
+    """Удаляет клиент пользователя"""
+    client = (
+        db.query(UserClient)
+        .filter(UserClient.id == client_id, UserClient.user_id == user_id)
+        .first()
+    )
+    if not client:
+        return False
+    db.delete(client)
+    db.commit()
+    return True
+
 
 
 def add_default_host(db: Session, inbound: ProxyInbound):
@@ -395,7 +465,8 @@ def create_user(db: Session, user: UserCreate, admin: Admin = None) -> User:
             expire=user.next_plan.expire,
             add_remaining_traffic=user.next_plan.add_remaining_traffic,
             fire_on_either=user.next_plan.fire_on_either,
-        ) if user.next_plan else None
+        ) if user.next_plan else None,
+        device_limit=user.device_limit,
     )
     db.add(dbuser)
     db.commit()
@@ -511,6 +582,9 @@ def update_user(db: Session, dbuser: User, modify: UserModify) -> User:
 
     if modify.on_hold_timeout is not None:
         dbuser.on_hold_timeout = modify.on_hold_timeout
+
+    if modify.device_limit is not None:
+        dbuser.device_limit = modify.device_limit
 
     if modify.on_hold_expire_duration is not None:
         dbuser.on_hold_expire_duration = modify.on_hold_expire_duration

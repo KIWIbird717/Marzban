@@ -16,10 +16,34 @@ from app.models.user import (
     UserStatus,
     UsersUsagesResponse,
     UserUsagesResponse,
+    UserClientResponse,
 )
 from app.utils import report, responses
 
 router = APIRouter(tags=["User"], prefix="/api", responses={401: responses._401})
+
+
+
+@router.get("/user/{username}/clients", response_model=List[UserClientResponse], responses={403: responses._403, 404: responses._404})
+def get_user_clients(
+    db: Session = Depends(get_db),
+    dbuser: UsersResponse = Depends(get_validated_user),
+):
+    """Список подключённых устройств пользователя."""
+    return crud.get_user_clients(db, dbuser.id)
+
+
+@router.delete("/user/{username}/clients/{client_id}", responses={403: responses._403, 404: responses._404})
+def remove_user_client(
+    client_id: int,
+    db: Session = Depends(get_db),
+    dbuser: UsersResponse = Depends(get_validated_user),
+):
+    """Удалить устройство пользователя (освободить слот)."""
+    removed = crud.remove_user_client(db, dbuser.id, client_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return {"detail": "Client removed"}
 
 
 @router.post("/user", response_model=UserResponse, responses={400: responses._400, 409: responses._409})
@@ -43,6 +67,7 @@ def add_user(
     - **on_hold_timeout**: UTC timestamp when `on_hold` status should start or end.
     - **on_hold_expire_duration**: Duration (in seconds) for how long the user should stay in `on_hold` status.
     - **next_plan**: Next user plan (resets after use).
+    - **device_limit**: Restrict user to add more devices than specified.
     """
 
     # TODO expire should be datetime instead of timestamp

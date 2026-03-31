@@ -9,6 +9,8 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
+      - "10000:10000"
+      - "1080:1080"
     volumes:
       - .:/code
       - ./.marzban/var/lib/marzban:/var/lib/marzban

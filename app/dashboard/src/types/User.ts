@@ -39,6 +39,7 @@ export type User = {
   proxies: ProxyType;
   expire: number | null;
   data_limit: number | null;
+  device_limit: number;
   data_limit_reset_strategy: DataLimitResetStrategy;
   on_hold_expire_duration: number | null;
   lifetime_used_traffic: number;
@@ -63,6 +64,7 @@ export type UserCreate = Pick<
   | "username"
   | "status"
   | "note"
+  | "device_limit"
 >;
 
 export type UserApi = {
@@ -70,7 +72,7 @@ export type UserApi = {
   is_sudo: boolean;
   telegram_id: number | string;
   username: string;
-}
+};
 
 export type UseGetUserReturn = {
   userData: UserApi;
@@ -78,4 +80,4 @@ export type UseGetUserReturn = {
   getUserIsSuccess: boolean;
   getUserIsError: boolean;
   getUserError: Error | null;
-}
+};

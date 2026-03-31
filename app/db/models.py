@@ -58,11 +58,28 @@ class AdminUsageLogs(Base):
     reset_at = Column(DateTime, default=datetime.utcnow)
 
 
+class UserClient(Base):
+    """
+    Table contains user active ips
+    """
+    __tablename__ = "user_clients"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_agent = Column(String(512), nullable=False)
+    first_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "user_agent", name="uq_user_client"),
+    )
+
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
-    username = Column(String(34, collation='NOCASE'), unique=True, index=True)
+    username = Column(String(34, collation='utf8mb4_unicode_ci'), unique=True, index=True)
+    device_limit = Column(Integer, nullable=False, default=0)
     proxies = relationship("Proxy", back_populates="user", cascade="all, delete-orphan")
     status = Column(Enum(UserStatus), nullable=False, default=UserStatus.active)
     used_traffic = Column(BigInteger, default=0)
@@ -100,6 +117,13 @@ class User(Base):
         uselist=False,
         back_populates="user",
         cascade="all, delete-orphan"
+    )
+
+    clients = relationship(
+        "UserClient",
+        backref="user",
+        cascade="all, delete-orphan",
+        lazy="select"
     )
 
     @hybrid_property
@@ -295,7 +319,7 @@ class Node(Base):
     __tablename__ = "nodes"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(256, collation='NOCASE'), unique=True)
+    name = Column(String(256, collation='utf8mb4_unicode_ci'), unique=True)
     address = Column(String(256), unique=False, nullable=False)
     port = Column(Integer, unique=False, nullable=False)
     api_port = Column(Integer, unique=False, nullable=False)

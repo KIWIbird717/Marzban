@@ -77,6 +77,12 @@ class User(BaseModel):
 
     next_plan: Optional[NextPlanModel] = Field(None, nullable=True)
 
+    device_limit: int = Field(
+        default=0,
+        ge=0,
+        description="Max simultaneous device IPs. 0 means unlimited."
+    )
+
     @field_validator('data_limit', mode='before')
     def cast_to_int(cls, v):
         if v is None:  # Allow None values
@@ -148,6 +154,7 @@ class UserCreate(User):
             "note": "",
             "on_hold_timeout": "2023-11-03T20:30:00",
             "on_hold_expire_duration": 0,
+            "device_limit": 0,
         }
     })
 
@@ -229,6 +236,7 @@ class UserModify(User):
             "note": "",
             "on_hold_timeout": "2023-11-03T20:30:00",
             "on_hold_expire_duration": 0,
+            "device_limit": 0,
         }
     })
 
@@ -364,3 +372,12 @@ class UserUsagesResponse(BaseModel):
 
 class UsersUsagesResponse(BaseModel):
     usages: List[UserUsageResponse]
+
+
+class UserClientResponse(BaseModel):
+    id: int
+    user_agent: str
+    first_seen: datetime
+    last_seen: datetime
+
+    model_config = ConfigDict(from_attributes=True)

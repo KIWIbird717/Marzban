@@ -110,6 +110,7 @@ const getDefaultValues = (): FormType => {
   return {
     selected_proxies: Object.keys(defaultInbounds) as ProxyKeys,
     data_limit: null,
+    device_limit: 1,
     expire: null,
     username: "",
     data_limit_reset_strategy: "no_reset",
@@ -171,6 +172,16 @@ const baseSchema = {
     .nullable()
     .transform((str) => {
       if (str) return Number((parseFloat(String(str)) * 1073741824).toFixed(5));
+      return 0;
+    }),
+  device_limit: z
+    .string()
+    .min(0)
+    .or(z.number())
+    .nullable()
+    .transform((str) => {
+      if (typeof str === "string") return parseInt(str);
+      if (typeof str === "number") return Math.trunc(str);
       return 0;
     }),
   expire: z.number().nullable(),
@@ -295,6 +306,7 @@ export const UserDialog: FC<UserDialogProps> = () => {
     let body: UserCreate = {
       ...rest,
       data_limit: values.data_limit,
+      device_limit: values.device_limit,
       proxies: mergeProxies(selected_proxies, values.proxies),
       data_limit_reset_strategy:
         values.data_limit && values.data_limit > 0
@@ -302,8 +314,8 @@ export const UserDialog: FC<UserDialogProps> = () => {
           : "no_reset",
       status:
         values.status === "active" ||
-          values.status === "disabled" ||
-          values.status === "on_hold"
+        values.status === "disabled" ||
+        values.status === "on_hold"
           ? values.status
           : "active",
     };
@@ -458,7 +470,10 @@ export const UserDialog: FC<UserDialogProps> = () => {
                                     return (
                                       <Tooltip
                                         placement="top"
-                                        label={"status: " + t(`status.${field.value}`)}
+                                        label={
+                                          "status: " +
+                                          t(`status.${field.value}`)
+                                        }
                                         textTransform="capitalize"
                                       >
                                         <Box>
@@ -539,6 +554,29 @@ export const UserDialog: FC<UserDialogProps> = () => {
                           }}
                         />
                       </FormControl>
+                      <FormControl mb={"10px"}>
+                        <FormLabel>Device limit</FormLabel>
+                        <Controller
+                          control={form.control}
+                          name="device_limit"
+                          render={({ field }) => {
+                            return (
+                              <Input
+                                endAdornment="Amount"
+                                type="number"
+                                size="sm"
+                                borderRadius="6px"
+                                onChange={field.onChange}
+                                disabled={disabled}
+                                error={
+                                  form.formState.errors.device_limit?.message
+                                }
+                                value={field.value ? String(field.value) : ""}
+                              />
+                            );
+                          }}
+                        />
+                      </FormControl>
                       <Collapse
                         in={!!(dataLimit && dataLimit > 0)}
                         animateOpacity
@@ -563,8 +601,11 @@ export const UserDialog: FC<UserDialogProps> = () => {
                                   }}
                                   sx={{
                                     option: {
-                                      backgroundColor: colorMode === "dark" ? "#222C3B" : "white"
-                                    }
+                                      backgroundColor:
+                                        colorMode === "dark"
+                                          ? "#222C3B"
+                                          : "white",
+                                    },
                                   }}
                                 >
                                   {resetStrategy.map((s) => {
@@ -654,13 +695,13 @@ export const UserDialog: FC<UserDialogProps> = () => {
                                         target: {
                                           value: date
                                             ? dayjs(
-                                              dayjs(date)
-                                                .set("hour", 23)
-                                                .set("minute", 59)
-                                                .set("second", 59)
-                                            )
-                                              .utc()
-                                              .valueOf() / 1000
+                                                dayjs(date)
+                                                  .set("hour", 23)
+                                                  .set("minute", 59)
+                                                  .set("second", 59)
+                                              )
+                                                .utc()
+                                                .valueOf() / 1000
                                             : 0,
                                           name: "expire",
                                         },
