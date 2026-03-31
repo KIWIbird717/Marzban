@@ -13,18 +13,23 @@ RUN apt-get update \
 
 COPY ./requirements.txt /code/
 RUN python3 -m pip install --upgrade pip setuptools \
-    && pip install --no-cache-dir --upgrade -r /code/requirements.txt
+    && pip wheel --no-cache-dir --wheel-dir=/wheels -r /code/requirements.txt
 
 FROM python:$PYTHON_VERSION-slim
 
+ENV PYTHONUNBUFFERED=1
 ENV PYTHON_LIB_PATH=/usr/local/lib/python${PYTHON_VERSION%.*}/site-packages
+
 WORKDIR /code
 
-RUN rm -rf $PYTHON_LIB_PATH/*
+COPY ./requirements.txt /code/requirements.txt
+COPY --from=build /wheels /wheels
+RUN pip install --no-cache-dir --no-index --find-links=/wheels -r /code/requirements.txt \
+    && pip install --no-cache-dir 'setuptools>=69,<82' \
+    && rm -rf /wheels
 
-COPY --from=build $PYTHON_LIB_PATH $PYTHON_LIB_PATH
-COPY --from=build /usr/local/bin /usr/local/bin
 COPY --from=build /usr/local/share/xray /usr/local/share/xray
+COPY --from=build /usr/local/bin/xray /usr/local/bin/xray
 
 COPY . /code
 

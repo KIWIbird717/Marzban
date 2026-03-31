@@ -1,8 +1,45 @@
 services:
   marzban:
-    image: gozargah/marzban:latest
+    build:
+      context: .
+      dockerfile: ./Dockerfile.prod
     restart: always
     env_file: .env
-    network_mode: host
     volumes:
       - /var/lib/marzban:/var/lib/marzban
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - marzban_network
+
+  mysql:
+    image: mysql:8.3
+    restart: always
+    env_file: .env
+    command:
+      - --mysqlx=OFF
+      - --character_set_server=utf8mb4
+      - --collation_server=utf8mb4_unicode_ci
+      - --disable-log-bin
+      - --host-cache-size=0
+      - --innodb-open-files=1024
+      - --innodb-buffer-pool-size=536870912
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    networks:
+      - marzban_network
+
+volumes:
+  mysql_data:
+    name: marzban_mysql_prod
+
+networks:
+  marzban_network:
+    driver: bridge
