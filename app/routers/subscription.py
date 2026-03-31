@@ -233,7 +233,7 @@ def user_subscription(
             for key, val in get_subscription_user_info(user).items()
         ),
         "hide-settings": "1" if SUB_HIDE_SETTINGS_HAPP else "0",
-        "announce": SUB_ANNOUNCE
+        "announce": encode_title(SUB_ANNOUNCE)
     }
 
     if re.match(r'^([Cc]lash-verge|[Cc]lash[-\.]?[Mm]eta|[Ff][Ll][Cc]lash|[Mm]ihomo)', user_agent):
