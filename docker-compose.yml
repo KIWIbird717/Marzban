@@ -7,7 +7,6 @@ services:
     env_file: .env
     ports:
       - "8000:8000"
-      - "443:443"
     volumes:
       - /var/lib/marzban:/var/lib/marzban
     depends_on:
@@ -45,4 +44,6 @@ volumes:
 
 networks:
   marzban_network:
+    external: true
+    name: shared_network
     driver: bridge
