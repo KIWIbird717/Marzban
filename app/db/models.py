@@ -66,12 +66,18 @@ class UserClient(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    hwid = Column(String(128), nullable=False)
     user_agent = Column(String(512), nullable=False)
+    device_model = Column(String(128), nullable=False)
+    device_os = Column(String(64), nullable=False)
+    app_version = Column(String(32), nullable=False)
+
     first_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
     last_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
-        UniqueConstraint("user_id", "user_agent", name="uq_user_client"),
+        UniqueConstraint("user_id", "hwid", name="uq_user_client_hwid"),
     )
 
 class User(Base):

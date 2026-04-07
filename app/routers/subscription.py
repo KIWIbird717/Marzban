@@ -1,6 +1,8 @@
 import re
 import json
 import base64
+from typing import Optional
+
 from distutils.version import LooseVersion
 
 from fastapi import APIRouter, Depends, Header, Path, Request, Response
@@ -28,6 +30,7 @@ from config import (
     SUB_DEVICE_LIMIT_TITLE,
     SUB_DEVICE_LIMIT_ANNOUNCE
 )
+from app.db.crud import ClientInfo
 
 client_config = {
     "clash-meta": {"config_format": "clash-meta", "media_type": "text/yaml", "as_base64": False, "reverse": False},
@@ -170,7 +173,11 @@ def user_subscription(
     request: Request,
     db: Session = Depends(get_db),
     dbuser: UserResponse = Depends(get_validated_sub),
-    user_agent: str = Header(default="")
+    user_agent: str = Header(default=""),
+    x_hwid: Optional[str] = Header(default=None),
+    x_device_model: Optional[str] = Header(default=None),
+    x_device_os: Optional[str] = Header(default=None),
+    x_app_version: Optional[str] = Header(default=None),
 ):
     """Provides a subscription link based on the user agent (Clash, V2Ray, etc.)."""
     user: UserResponse = UserResponse.model_validate(dbuser)
@@ -184,8 +191,16 @@ def user_subscription(
             )
         )
 
+    # Собираем данные клиента из заголовков
+    client = ClientInfo(
+        hwid=x_hwid,
+        user_agent=user_agent,
+        device_model=x_device_model,
+        device_os=x_device_os,
+        app_version=x_app_version,
+    )
     # Проверяем и регистрируем клиента
-    allowed = crud.register_user_client(db, dbuser, user_agent)
+    allowed = crud.register_user_client(db, dbuser, client)
     if not allowed:
         response_headers = {
             "content-disposition": f'attachment; filename="{user.username}"',

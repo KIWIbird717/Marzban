@@ -77,10 +77,11 @@ class User(BaseModel):
 
     next_plan: Optional[NextPlanModel] = Field(None, nullable=True)
 
-    device_limit: int = Field(
-        default=0,
+    device_limit: Optional[int] = Field(
+        default=None,
         ge=0,
-        description="Max simultaneous device IPs. 0 means unlimited."
+        description="Max simultaneous device IPs. 0 means unlimited.",
+        nullable=True
     )
 
     @field_validator('data_limit', mode='before')
@@ -376,8 +377,22 @@ class UsersUsagesResponse(BaseModel):
 
 class UserClientResponse(BaseModel):
     id: int
+    hwid: Optional[str] = None
     user_agent: str
+    device_model: Optional[str] = None
+    device_os: Optional[str] = None
+    app_version: Optional[str] = None
     first_seen: datetime
     last_seen: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @property
+    def display_name(self) -> str:
+        """Форматирует строку вида: iPhone 11 (iOS 17.6.1)"""
+        parts = []
+        if self.device_model:
+            parts.append(self.device_model)
+        if self.device_os:
+            parts.append(f"({self.device_os})")
+        return " ".join(parts) if parts else self.user_agent

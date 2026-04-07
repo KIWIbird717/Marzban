@@ -5,6 +5,7 @@ Functions for managing proxy hosts, users, user templates, nodes, and administra
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, List, Optional, Tuple, Union
+from dataclasses import dataclass
 
 from sqlalchemy import and_, delete, func, or_
 from sqlalchemy.orm import Query, Session, joinedload
@@ -47,6 +48,14 @@ from app.models.user_template import UserTemplateCreate, UserTemplateModify
 from app.utils.helpers import calculate_expiration_days, calculate_usage_percent
 from config import NOTIFY_DAYS_LEFT, NOTIFY_REACHED_USAGE_PERCENT, USERS_AUTODELETE_DAYS, IP_ACTIVITY_TTL
 
+@dataclass
+class ClientInfo:
+    """Данные клиента из заголовков запроса."""
+    hwid: Optional[str]
+    user_agent: str
+    device_model: Optional[str]
+    device_os: Optional[str]
+    app_version: Optional[str]
 
 def get_user_clients(db: Session, user_id: int) -> List[UserClient]:
     return (
@@ -57,45 +66,71 @@ def get_user_clients(db: Session, user_id: int) -> List[UserClient]:
     )
 
 
-def register_user_client(db: Session, dbuser: User, user_agent: str) -> bool:
+def register_user_client(db: Session, dbuser: User, client: ClientInfo) -> bool:
     """
-    Регистрирует клиент пользователя по user_agent.
+    Регистрирует клиент пользователя.
+    Идентификатор — hwid (если есть), иначе user_agent.
 
     Возвращает:
-        True  — клиент добавлен или уже существует (можно отдавать конфиг)
-        False — лимит устройств исчерпан (отказать)
+        True  — клиент добавлен или уже существует
+        False — лимит устройств исчерпан
     """
-    if not user_agent:
-        return True  # нет user_agent — пропускаем проверку
+    if not client.user_agent and not client.hwid:
+        return True  # нет идентификатора — пропускаем
 
-    # Известный клиент — просто обновляем last_seen
-    existing = (
-        db.query(UserClient)
-        .filter(
-            UserClient.user_id == dbuser.id,
-            UserClient.user_agent == user_agent,
+    # Ищем существующего клиента
+    existing = None
+    if client.hwid:
+        existing = (
+            db.query(UserClient)
+            .filter(
+                UserClient.user_id == dbuser.id,
+                UserClient.hwid == client.hwid,
+            )
+            .first()
         )
-        .first()
-    )
+    else:
+        # Fallback: нет hwid — ищем по user_agent
+        existing = (
+            db.query(UserClient)
+            .filter(
+                UserClient.user_id == dbuser.id,
+                UserClient.user_agent == client.user_agent,
+                UserClient.hwid.is_(None),
+            )
+            .first()
+        )
+
     if existing:
+        # Обновляем данные при каждом обращении
         existing.last_seen = datetime.utcnow()
+        existing.user_agent = client.user_agent
+        if client.device_model:
+            existing.device_model = client.device_model
+        if client.device_os:
+            existing.device_os = client.device_os
+        if client.app_version:
+            existing.app_version = client.app_version
         db.commit()
         return True
 
     # Новый клиент — проверяем лимит
-    if dbuser.device_limit >= 0:
+    if dbuser.device_limit > 0:
         current_count = (
             db.query(UserClient)
             .filter(UserClient.user_id == dbuser.id)
             .count()
         )
         if current_count >= dbuser.device_limit:
-            return False  # лимит исчерпан
+            return False
 
-    # Добавляем нового клиента
     db.add(UserClient(
         user_id=dbuser.id,
-        user_agent=user_agent,
+        hwid=client.hwid,
+        user_agent=client.user_agent,
+        device_model=client.device_model,
+        device_os=client.device_os,
+        app_version=client.app_version,
     ))
     db.commit()
     return True
