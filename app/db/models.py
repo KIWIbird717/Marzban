@@ -65,13 +65,14 @@ class UserClient(Base):
     __tablename__ = "user_clients"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"),
+                     nullable=False, index=True)
 
     hwid = Column(String(128), nullable=False)
-    user_agent = Column(String(512), nullable=False)
-    device_model = Column(String(128), nullable=False)
-    device_os = Column(String(64), nullable=False)
-    app_version = Column(String(32), nullable=False)
+    user_agent = Column(String(512), nullable=True)
+    device_model = Column(String(128), nullable=True)
+    device_os = Column(String(64), nullable=True)
+    app_version = Column(String(32), nullable=True)
 
     first_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
     last_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -80,24 +81,31 @@ class UserClient(Base):
         UniqueConstraint("user_id", "hwid", name="uq_user_client_hwid"),
     )
 
+
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
-    username = Column(String(34, collation='utf8mb4_unicode_ci'), unique=True, index=True)
+    username = Column(
+        String(34, collation='utf8mb4_unicode_ci'), unique=True, index=True)
     device_limit = Column(Integer, nullable=False, default=0)
-    proxies = relationship("Proxy", back_populates="user", cascade="all, delete-orphan")
-    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.active)
+    proxies = relationship("Proxy", back_populates="user",
+                           cascade="all, delete-orphan")
+    status = Column(Enum(UserStatus), nullable=False,
+                    default=UserStatus.active)
     used_traffic = Column(BigInteger, default=0)
-    node_usages = relationship("NodeUserUsage", back_populates="user", cascade="all, delete-orphan")
-    notification_reminders = relationship("NotificationReminder", back_populates="user", cascade="all, delete-orphan")
+    node_usages = relationship(
+        "NodeUserUsage", back_populates="user", cascade="all, delete-orphan")
+    notification_reminders = relationship(
+        "NotificationReminder", back_populates="user", cascade="all, delete-orphan")
     data_limit = Column(BigInteger, nullable=True)
     data_limit_reset_strategy = Column(
         Enum(UserDataLimitResetStrategy),
         nullable=False,
         default=UserDataLimitResetStrategy.no_reset,
     )
-    usage_logs = relationship("UserUsageResetLogs", back_populates="user")  # maybe rename it to reset_usage_logs?
+    # maybe rename it to reset_usage_logs?
+    usage_logs = relationship("UserUsageResetLogs", back_populates="user")
     expire = Column(Integer, nullable=True)
     admin_id = Column(Integer, ForeignKey("admins.id"))
     admin = relationship("Admin", back_populates="users")
@@ -116,7 +124,8 @@ class User(Base):
     auto_delete_in_days = Column(Integer, nullable=True, default=None)
 
     edit_at = Column(DateTime, nullable=True, default=None)
-    last_status_change = Column(DateTime, default=datetime.utcnow, nullable=True)
+    last_status_change = Column(
+        DateTime, default=datetime.utcnow, nullable=True)
 
     next_plan = relationship(
         "NextPlan",
@@ -197,8 +206,10 @@ class NextPlan(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     data_limit = Column(BigInteger, nullable=False)
     expire = Column(Integer, nullable=True)
-    add_remaining_traffic = Column(Boolean, nullable=False, default=False, server_default='0')
-    fire_on_either = Column(Boolean, nullable=False, default=True, server_default='0')
+    add_remaining_traffic = Column(
+        Boolean, nullable=False, default=False, server_default='0')
+    fire_on_either = Column(Boolean, nullable=False,
+                            default=True, server_default='0')
 
     user = relationship("User", back_populates="next_plan")
 
@@ -285,15 +296,19 @@ class ProxyHost(Base):
         server_default=ProxyHostSecurity.none.name
     )
 
-    inbound_tag = Column(String(256), ForeignKey("inbounds.tag"), nullable=False)
+    inbound_tag = Column(String(256), ForeignKey(
+        "inbounds.tag"), nullable=False)
     inbound = relationship("ProxyInbound", back_populates="hosts")
     allowinsecure = Column(Boolean, nullable=True)
     is_disabled = Column(Boolean, nullable=True, default=False)
-    mux_enable = Column(Boolean, nullable=False, default=False, server_default='0')
+    mux_enable = Column(Boolean, nullable=False,
+                        default=False, server_default='0')
     fragment_setting = Column(String(100), nullable=True)
     noise_setting = Column(String(2000), nullable=True)
-    random_user_agent = Column(Boolean, nullable=False, default=False, server_default='0')
-    use_sni_as_host = Column(Boolean, nullable=False, default=False, server_default="0")
+    random_user_agent = Column(
+        Boolean, nullable=False, default=False, server_default='0')
+    use_sni_as_host = Column(Boolean, nullable=False,
+                             default=False, server_default="0")
 
 
 class System(Base):
@@ -330,15 +345,19 @@ class Node(Base):
     port = Column(Integer, unique=False, nullable=False)
     api_port = Column(Integer, unique=False, nullable=False)
     xray_version = Column(String(32), nullable=True)
-    status = Column(Enum(NodeStatus), nullable=False, default=NodeStatus.connecting)
+    status = Column(Enum(NodeStatus), nullable=False,
+                    default=NodeStatus.connecting)
     last_status_change = Column(DateTime, default=datetime.utcnow)
     message = Column(String(1024), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     uplink = Column(BigInteger, default=0)
     downlink = Column(BigInteger, default=0)
-    user_usages = relationship("NodeUserUsage", back_populates="node", cascade="all, delete-orphan")
-    usages = relationship("NodeUsage", back_populates="node", cascade="all, delete-orphan")
-    usage_coefficient = Column(Float, nullable=False, server_default=text("1.0"), default=1)
+    user_usages = relationship(
+        "NodeUserUsage", back_populates="node", cascade="all, delete-orphan")
+    usages = relationship("NodeUsage", back_populates="node",
+                          cascade="all, delete-orphan")
+    usage_coefficient = Column(
+        Float, nullable=False, server_default=text("1.0"), default=1)
 
 
 class NodeUserUsage(Base):
@@ -348,7 +367,8 @@ class NodeUserUsage(Base):
     )
 
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, unique=False, nullable=False)  # one hour per record
+    created_at = Column(DateTime, unique=False,
+                        nullable=False)  # one hour per record
     user_id = Column(Integer, ForeignKey("users.id"))
     user = relationship("User", back_populates="node_usages")
     node_id = Column(Integer, ForeignKey("nodes.id"))
@@ -363,7 +383,8 @@ class NodeUsage(Base):
     )
 
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, unique=False, nullable=False)  # one hour per record
+    created_at = Column(DateTime, unique=False,
+                        nullable=False)  # one hour per record
     node_id = Column(Integer, ForeignKey("nodes.id"))
     node = relationship("Node", back_populates="usages")
     uplink = Column(BigInteger, default=0)
